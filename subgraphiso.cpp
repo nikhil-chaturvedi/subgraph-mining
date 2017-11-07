@@ -57,6 +57,13 @@ public:
 	}
 };
 
+bool subgraphiso(ARGraph<Atom, Bond> *g1, ARGraph<Atom, Bond> *g2) {
+	VF2SubState s0(g1, g2);
+
+	node_id ni1[5], ni2[5];
+	int n;
+	return match(&s0, &n, ni1, ni2);
+}
 
 int main() {
 	ARGEdit ed1, ed2;
@@ -82,7 +89,7 @@ int main() {
 	ed2.InsertEdge(4, 3, new Bond(1));
 	ed2.InsertEdge(3, 1, new Bond(2));
 	ed2.InsertEdge(1, 3, new Bond(2));
-	
+
 	ARGraph<Atom, Bond> g1(&ed1);
 	ARGraph<Atom, Bond> g2(&ed2);
 
@@ -94,13 +101,14 @@ int main() {
 	g2.SetNodeComparator(new AtomComparator());
 	g2.SetEdgeComparator(new BondComparator());
 	
-	VF2SubState s0(&g1, &g2);
-
-	node_id ni1[5], ni2[5];
-	int n;
-	if(match(&s0, &n, ni1, ni2)) {
-		printf("Found a matching with %d nodes\n", n);
+	if(subgraphiso(&g1, &g2)) {
+		printf("Found a matching\n");
 	}
+
+	if(subgraphiso(&g1, &g2)) {
+		printf("Found a matching\n");
+	}
+
 
 	return 0;
 }
