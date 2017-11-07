@@ -1,5 +1,8 @@
 #include <string>
 #include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
 
 // VFLib includes
 #include <argraph.h>
@@ -65,50 +68,82 @@ bool subgraphiso(ARGraph<Atom, Bond> *g1, ARGraph<Atom, Bond> *g2) {
 	return match(&s0, &n, ni1, ni2);
 }
 
+class DBGraph {
+	ARGraph<Atom, Bond>* g;
+
+	int id;
+	int type;
+	int support;
+
+	bool feature;
+
+public:
+	DBGraph (ARGEdit *ed, int id, int type, int support, bool gaston) {
+		this->g = new ARGraph<Atom, Bond>(ed);
+
+		this->id = id;
+		this->type = type;
+		this->feature = false;
+		this->support = (gaston)? support : 0;
+
+		this->g->SetNodeDestroyer(new AtomDestroyer());
+		this->g->SetEdgeDestroyer(new BondDestroyer());
+
+		if (!gaston) {
+			this->g->SetNodeComparator(new AtomComparator());
+			this->g->SetEdgeComparator(new BondComparator());
+		}
+	}
+};
+
+void readFile(string filename, bool gaston, int type, vector<DBGraph*>& db) {
+	ifstream f(filename);
+
+	char temp;
+	f >> temp;
+	while (1) {
+		int id, support = 0;
+
+		if (gaston) {
+			f >> support;
+			f >> temp;
+		}
+		f >> temp;
+		f >> id;
+
+		f >> temp;
+		ARGEdit ed;
+		while (temp == 'e' || temp == 'v') {
+			if (temp == 'v') {
+				int val;
+				f >> val;
+				f >> val;
+				ed.InsertNode(new Atom(to_string(val)));
+			} else {
+				int node1, node2, bond;
+				f >> node1;
+				f >> node2;
+				f >> bond;
+
+				ed.InsertEdge(node1, node2, new Bond(bond));
+				ed.InsertEdge(node2, node1, new Bond(bond));
+			}
+			temp = (char)0;
+			f >> temp;
+
+			if ((int)temp == 0)
+				break;
+		}
+
+		db.push_back(new DBGraph(&ed, id, type, support, gaston));
+
+		if ((int)temp == 0)
+			break;
+	}
+}
+
 int main() {
-	ARGEdit ed1, ed2;
-	ed1.InsertNode(new Atom("C"));
-	ed1.InsertNode(new Atom("C"));
-	ed1.InsertNode(new Atom("C"));
-	ed1.InsertEdge(0, 1, new Bond(1));
-	ed1.InsertEdge(1, 0, new Bond(1));
-	ed1.InsertEdge(0, 2, new Bond(1));
-	ed1.InsertEdge(2, 0, new Bond(1));
-	ed1.InsertEdge(2, 1, new Bond(2));
-	ed1.InsertEdge(1, 2, new Bond(2));
-	ed2.InsertNode(new Atom("N"));
-	ed2.InsertNode(new Atom("C"));
-	ed2.InsertNode(new Atom("S"));
-	ed2.InsertNode(new Atom("C"));
-	ed2.InsertNode(new Atom("C"));
-	ed2.InsertEdge(1, 4, new Bond(1));
-	ed2.InsertEdge(4, 1, new Bond(1));
-	ed2.InsertEdge(1, 2, new Bond(2));
-	ed2.InsertEdge(2, 1, new Bond(2));
-	ed2.InsertEdge(3, 4, new Bond(1));
-	ed2.InsertEdge(4, 3, new Bond(1));
-	ed2.InsertEdge(3, 1, new Bond(2));
-	ed2.InsertEdge(1, 3, new Bond(2));
-
-	ARGraph<Atom, Bond> g1(&ed1);
-	ARGraph<Atom, Bond> g2(&ed2);
-
-	g1.SetNodeDestroyer(new AtomDestroyer());
-	g2.SetNodeDestroyer(new AtomDestroyer());
-	g1.SetEdgeDestroyer(new BondDestroyer());
-	g2.SetEdgeDestroyer(new BondDestroyer());
-
-	g2.SetNodeComparator(new AtomComparator());
-	g2.SetEdgeComparator(new BondComparator());
-	
-	if(subgraphiso(&g1, &g2)) {
-		printf("Found a matching\n");
-	}
-
-	if(subgraphiso(&g1, &g2)) {
-		printf("Found a matching\n");
-	}
-
-
+	vector<DBGraph*> db;
+	readFile("aids_data.txt", false, 0, db);
 	return 0;
 }
