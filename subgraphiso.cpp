@@ -15,8 +15,8 @@ using namespace std;
 
 class Atom {
 public:
-	string atom;
-	Atom(string atom) {
+	int atom;
+	Atom(int atom) {
 		this->atom = atom;
 	}
 };
@@ -48,7 +48,7 @@ public:
 	virtual bool compatible(void* a, void* b) {
 		Atom *a1 = (Atom*) a;
 		Atom *b1 = (Atom*) b;
-		return a == b;
+		return (a1->atom == b1->atom);
 	}
 };
 
@@ -57,16 +57,20 @@ public:
 	virtual bool compatible(void* a, void* b) {
 		Bond *a1 = (Bond*) a;
 		Bond *b1 = (Bond*) b;
-		return a == b;
+		return (a1->bond_type == b1->bond_type);
 	}
 };
 
 bool subgraphiso(ARGraph<Atom, Bond> *g1, ARGraph<Atom, Bond> *g2) {
 	VF2SubState s0(g1, g2);
 
-	node_id ni1[5], ni2[5];
+	node_id ni1[100], ni2[100];
 	int n;
-	return match(&s0, &n, ni1, ni2);
+	bool x = match(&s0, &n, ni1, ni2);
+	// for(int i = 0; i < 100; i++)
+	// 	cout << ni2[i] << " ";
+	// cout << "\n";
+	return x;
 }
 
 class DBGraph {
@@ -92,7 +96,7 @@ public:
 		this->g->SetNodeDestroyer(new AtomDestroyer());
 		this->g->SetEdgeDestroyer(new BondDestroyer());
 
-		if (!gaston) {
+		if (gaston) {
 			this->g->SetNodeComparator(new AtomComparator());
 			this->g->SetEdgeComparator(new BondComparator());
 		}
@@ -125,7 +129,7 @@ void readFile(string filename, bool gaston, int type, vector<DBGraph*>& db, bool
 				int val;
 				f >> val;
 				f >> val;
-				ed.InsertNode(new Atom(to_string(val)));
+				ed.InsertNode(new Atom(val));
 			} else {
 				int node1, node2, bond;
 				f >> node1;
@@ -153,72 +157,78 @@ void readFile(string filename, bool gaston, int type, vector<DBGraph*>& db, bool
 	f.close();
 }
 
-void check_significance(vector<DBGraph*>& subgraphs, vector<DBGraph*>& min_class_graphs, double alpha) {
-	int out_trial = 0;
-	for(int i = 14; i < subgraphs.size(); i++) {
-		cout << "Out_trial: " << out_trial << "\n";
-		int in_trial = 0;
+void check_significance(vector<DBGraph*>& subgraphs, vector<DBGraph*>& min_class_graphs, int max_class_size, double alpha) {
+	int significant = 0;
+	for(int i = 0; i < subgraphs.size(); i++) {
 		int min_count = 0;
 		for(int j = 0; j < min_class_graphs.size(); j++) {
-			cout << (min_class_graphs[j]->g)->NodeCount() << "\n";
-			cout << (subgraphs[i]->g)->NodeCount() << "\n";
 			int is_subgraph = subgraphiso(subgraphs[i]->g, min_class_graphs[j]->g);
-			cout << is_subgraph << "\n";
+			// if(!is_subgraph)
+			// 	cout << "Found: " << is_subgraph << "\n";
 			if(is_subgraph)
 				min_count++;
-			cout << "In_trial: " << in_trial << "\n";
-			in_trial++;
 		}
-		double ratio = ((double) subgraphs[i]->support)/((double) subgraphs[i]->support + min_count);
+
+		double min_ratio = ((double) min_count) / ((double) min_class_graphs.size());
+		double max_ratio = ((double) subgraphs[i]->support) / ((double) max_class_size);
+
+		double ratio = max_ratio / (max_ratio + min_ratio);
 		if(ratio > alpha) {
 			subgraphs[i]->feature = true;
-			cout << "Min_count: " << min_count << "\n";
+			significant++;
 		}
-		out_trial++;
 	}
+	cout << "Significant: " << significant << "\n";
 }
 
 void generate_features(map<int, DBGraph*>& train, vector<DBGraph*>& gaston_pos, vector<DBGraph*>& gaston_neg, vector<DBGraph*>& test) {
 	ofstream ftrain("train.txt");
 	for(int j = 0; j < train.size(); j++) {
-		ftrain << train[j]->type;
+		int fcount = 0;
+		ftrain << train[j]->type << " ";
 		for(int i = 0; i < gaston_pos.size(); i++) {
 			if(!(gaston_pos[i]->feature))
 				continue;
+			fcount++;
 			if(subgraphiso(gaston_pos[i]->g, train[j]->g))
-				ftrain << gaston_pos[i]->id << ":1 ";
+				ftrain << fcount << ":1 ";
 			else
-				ftrain << gaston_pos[i]->id << ":0 ";
+				ftrain << fcount << ":0 ";
 		}
 		for(int i = 0; i < gaston_neg.size(); i++) {
 			if(!(gaston_neg[i]->feature))
 				continue;
+			fcount++;
 			if(subgraphiso(gaston_neg[i]->g, train[j]->g))
-				ftrain << gaston_neg[i]->id << ":1 ";
+				ftrain << fcount << ":1 ";
 			else
-				ftrain << gaston_neg[i]->id << ":0 ";
+				ftrain << fcount << ":0 ";
 		}
 		ftrain << "\n";
 	}
 	ftrain.close();
 	ofstream ftest("test.txt");
-	for(int j = 0; j < train.size(); j++) {
+	for(int j = 0; j < test.size(); j++) {
+		int fcount = 0;
 		for(int i = 0; i < gaston_pos.size(); i++) {
 			if(!(gaston_pos[i]->feature))
 				continue;
-			if(subgraphiso(gaston_pos[i]->g, train[j]->g))
-				cout << gaston_pos[i]->id << ":1 ";
+			fcount++;
+			if(subgraphiso(gaston_pos[i]->g, test[j]->g))
+				ftest << fcount << ":1 ";
 			else
-				cout << gaston_pos[i]->id << ":0 ";
+				ftest << fcount << ":0 ";
 		}
 		for(int i = 0; i < gaston_neg.size(); i++) {
 			if(!(gaston_neg[i]->feature))
 				continue;
-			if(subgraphiso(gaston_neg[i]->g, train[j]->g))
-				ftrain << gaston_neg[i]->id << ":1 ";
+			fcount++;
+			if(subgraphiso(gaston_neg[i]->g, test[j]->g))
+				ftest << fcount << ":1 ";
 			else
-				ftrain << gaston_neg[i]->id << ":0 ";
+				ftest << fcount << ":0 ";
 		}
+		ftest << "\n";
 	}
 	ftest.close();
 }
@@ -231,6 +241,56 @@ int main() {
 	readFile("gaston_pos.txt", true, 1, gaston_pos, false, ordered_train);
 	readFile("gaston_neg.txt", true, -1, gaston_neg, false, ordered_train);
 	readFile("test_graphs.txt", false, 0, test, false, ordered_train);
-	check_significance(gaston_neg, train_pos, 0.8);
+	int pos_size = train_pos.size();
+	int neg_size = train_neg.size();
+	check_significance(gaston_neg, train_pos, neg_size, 0.8);
+	check_significance(gaston_pos, train_neg, pos_size, 0.8);
+	generate_features(ordered_train, gaston_pos, gaston_neg, test);
+
+
+	// ARGEdit ed1, ed2;
+	// ed1.InsertNode(new Atom(1));
+	// ed1.InsertNode(new Atom(0));
+	// ed1.InsertNode(new Atom(0));
+	// ed1.InsertNode(new Atom(0));
+	// ed1.InsertNode(new Atom(3));
+	// ed2.InsertNode(new Atom(0));
+	// ed2.InsertNode(new Atom(0));
+	// ed2.InsertNode(new Atom(0));
+	// ed1.InsertEdge(2, 1, new Bond(1));
+	// ed1.InsertEdge(1, 2, new Bond(1));
+	// ed1.InsertEdge(2, 3, new Bond(0));
+	// ed1.InsertEdge(3, 2, new Bond(0));
+	// ed1.InsertEdge(1, 3, new Bond(0));
+	// ed1.InsertEdge(3, 1, new Bond(0));
+	// ed1.InsertEdge(2, 0, new Bond(2));
+	// ed1.InsertEdge(0, 2, new Bond(2));
+	// ed1.InsertEdge(1, 4, new Bond(0));
+	// ed1.InsertEdge(4, 1, new Bond(0));
+	// ed2.InsertEdge(0, 1, new Bond(1));
+	// ed2.InsertEdge(1, 0, new Bond(1));
+	// ed2.InsertEdge(2, 1, new Bond(0));
+	// ed2.InsertEdge(1, 2, new Bond(0));
+	// ed2.InsertEdge(0, 2, new Bond(0));
+	// ed2.InsertEdge(2, 0, new Bond(0));
+
+	// ARGraph<Atom, Bond> g1(&ed1);
+	// ARGraph<Atom, Bond> g2(&ed2);
+	// g1.SetNodeDestroyer(new AtomDestroyer());
+	// g1.SetEdgeDestroyer(new BondDestroyer());
+	// g2.SetNodeDestroyer(new AtomDestroyer());
+	// g2.SetEdgeDestroyer(new BondDestroyer());
+	// g2.SetNodeComparator(new AtomComparator());
+	// g2.SetEdgeComparator(new BondComparator());
+
+	// VF2SubState s0(&g2, &g1);
+
+	// node_id ni1[100], ni2[100];
+	// int n;
+	// bool x = match(&s0, &n, ni1, ni2);
+	// if(x) {
+	// 	cout << "Found\n";
+	// }
+
 	return 0;
 }

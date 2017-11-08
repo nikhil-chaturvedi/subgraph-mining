@@ -42,13 +42,13 @@ while 1:
 		active[graphID].append(nodes)
 		active[graphID].append(edges)
 		active[graphID].append(gcount)
+		gcount += 1
 
 	if (graphID in inactive):
 		inactive[graphID].append(nodes)
 		inactive[graphID].append(edges)
 		inactive[graphID].append(gcount)
-
-	gcount += 1
+		gcount += 1
 
 f1.close()
 f2.close()
@@ -101,9 +101,9 @@ for key in inactive:
 	if inactive[key] == []:
 		continue
 
-	f5.write("t # " + key + " " + str(graph[2]) + "\n")
-
 	graph = inactive[key]
+
+	f5.write("t # " + key + " " + str(graph[2]) + "\n")
 
 	for i in xrange(len(graph[0])):
 		f5.write("v " + str(i) + " " + str(graph[0][i]) + "\n")
